@@ -50,7 +50,11 @@ func (a *API) Login(ctx context.Context, vendorID, ekp, secret, password string)
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if cerr := res.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:

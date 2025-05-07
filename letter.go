@@ -57,7 +57,11 @@ func (a API) CreateLetters(ctx context.Context, letters []Letter) ([]LetterIdent
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if cerr := res.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -147,7 +151,11 @@ func (a API) GetLettersStatusList(ctx context.Context, letterIDs []int) ([]Lette
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if cerr := res.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%d: %s", res.StatusCode, res.Status)

@@ -12,7 +12,7 @@ type Time struct {
 }
 
 func (t Time) MarshalJSON() ([]byte, error) {
-	if y := t.Time.Year(); y < 0 || y >= 10000 {
+	if y := t.Year(); y < 0 || y >= 10000 {
 		// RFC 3339 is clear that years are 4 digits exactly.
 		// See golang.org/issue/4556#c15 for more discussion.
 		return nil, errors.New("Time.MarshalJSON: year outside of range [0,9999]")
@@ -20,7 +20,7 @@ func (t Time) MarshalJSON() ([]byte, error) {
 
 	b := make([]byte, 0, len(TimeFormat)+2)
 	b = append(b, '"')
-	b = t.Time.AppendFormat(b, TimeFormat)
+	b = t.AppendFormat(b, TimeFormat)
 	b = append(b, '"')
 
 	return b, nil
