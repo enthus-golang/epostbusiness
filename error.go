@@ -13,9 +13,9 @@ import (
 const maxErrorBodyBytes = 1 << 20 // 1 MiB
 
 // APIError is returned when the E-POSTBUSINESS API responds with a non-2xx status.
-// It preserves the HTTP status code and the raw response body so callers can log
-// and react to the actual provider error instead of a flattened message. When the
-// body is the provider's JSON error envelope, its fields are parsed out too.
+// It preserves the HTTP status code and the raw response body so callers can log and
+// react to the actual provider error. When the body is the provider's JSON error
+// envelope, its fields are parsed out too.
 type APIError struct {
 	StatusCode  int       // HTTP status code returned by the API.
 	Code        string    // Provider error code (e.g. "E315"), if the body parsed.
