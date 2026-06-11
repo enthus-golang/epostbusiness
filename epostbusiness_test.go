@@ -32,11 +32,13 @@ func newTestAPI(status int, body string) *API {
 func TestAPIErrorError(t *testing.T) {
 	cases := []struct {
 		name string
-		err  APIError
+		err  *APIError
 		want string
 	}{
-		{"with code and description", APIError{Code: "E315", Description: "Fehler in Sendungsverarbeitung"}, "E315: Fehler in Sendungsverarbeitung"},
-		{"empty envelope falls back to status", APIError{StatusCode: http.StatusBadGateway}, "epostbusiness: unexpected status 502"},
+		{"with code and description", &APIError{Code: "E315", Description: "Fehler in Sendungsverarbeitung"}, "E315: Fehler in Sendungsverarbeitung"},
+		{"description only", &APIError{Description: "Fehler in Sendungsverarbeitung"}, "Fehler in Sendungsverarbeitung"},
+		{"code only", &APIError{Code: "E315"}, "error code E315"},
+		{"empty envelope falls back to status", &APIError{StatusCode: http.StatusBadGateway}, "epostbusiness: unexpected status 502"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -68,6 +70,36 @@ func TestNewAPIErrorParsesEnvelope(t *testing.T) {
 	}
 	if string(e.Body) != body {
 		t.Errorf("Body = %q, want the raw body", e.Body)
+	}
+}
+
+func TestNewAPIErrorMalformedDate(t *testing.T) {
+	// A missing or non-RFC3339 date must not drop the rest of the envelope.
+	const body = `{"level":"Error","code":"E315","description":"Fehler","date":"not-a-date"}`
+	e := newAPIError(&http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(body))})
+
+	if e.Code != "E315" {
+		t.Errorf("Code = %q, want E315 (must survive a bad date)", e.Code)
+	}
+	if e.Description != "Fehler" {
+		t.Errorf("Description = %q, want Fehler", e.Description)
+	}
+	if !e.Date.IsZero() {
+		t.Errorf("Date = %v, want zero for an unparseable date", e.Date)
+	}
+}
+
+func TestNewAPIErrorNilResponse(t *testing.T) {
+	if e := newAPIError(nil); e == nil {
+		t.Fatal("newAPIError(nil) returned nil, want non-nil *APIError")
+	}
+
+	e := newAPIError(&http.Response{StatusCode: http.StatusBadGateway})
+	if e.StatusCode != http.StatusBadGateway {
+		t.Errorf("StatusCode = %d, want 502", e.StatusCode)
+	}
+	if len(e.Body) != 0 {
+		t.Errorf("Body = %q, want empty for a nil response body", e.Body)
 	}
 }
 

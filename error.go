@@ -26,23 +26,40 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	if e.Code != "" || e.Description != "" {
+	switch {
+	case e.Code != "" && e.Description != "":
 		return fmt.Sprintf("%s: %s", e.Code, e.Description)
+	case e.Description != "":
+		return e.Description
+	case e.Code != "":
+		return fmt.Sprintf("error code %s", e.Code)
+	default:
+		return fmt.Sprintf("epostbusiness: unexpected status %d", e.StatusCode)
 	}
-	return fmt.Sprintf("epostbusiness: unexpected status %d", e.StatusCode)
 }
 
+// errorEnvelope is the provider's JSON error body. Date is a string (parsed
+// separately) so a missing or non-RFC3339 date does not fail the whole decode and
+// drop the code/level/description.
 type errorEnvelope struct {
-	Level       string    `json:"level"`
-	Code        string    `json:"code"`
-	Description string    `json:"description"`
-	Date        time.Time `json:"date"`
+	Level       string `json:"level"`
+	Code        string `json:"code"`
+	Description string `json:"description"`
+	Date        string `json:"date"`
 }
 
 // newAPIError reads the (bounded) response body and builds an APIError, parsing the
-// provider's JSON error envelope when present. The caller still closes res.Body.
+// provider's JSON error envelope when present. It always returns a non-nil
+// *APIError. The caller still closes res.Body.
 func newAPIError(res *http.Response) *APIError {
-	body, _ := io.ReadAll(io.LimitReader(res.Body, maxErrorBodyBytes))
+	if res == nil {
+		return &APIError{}
+	}
+
+	var body []byte
+	if res.Body != nil {
+		body, _ = io.ReadAll(io.LimitReader(res.Body, maxErrorBodyBytes))
+	}
 
 	e := &APIError{StatusCode: res.StatusCode, Body: body}
 
@@ -51,7 +68,11 @@ func newAPIError(res *http.Response) *APIError {
 		e.Code = env.Code
 		e.Level = env.Level
 		e.Description = env.Description
-		e.Date = env.Date
+		if env.Date != "" {
+			if date, perr := time.Parse(time.RFC3339, env.Date); perr == nil {
+				e.Date = date
+			}
+		}
 	}
 
 	return e
