@@ -8,7 +8,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
+
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("read failed") }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
@@ -65,8 +70,9 @@ func TestNewAPIErrorParsesEnvelope(t *testing.T) {
 	if e.Description != "Fehler in Sendungsverarbeitung" {
 		t.Errorf("Description = %q", e.Description)
 	}
-	if e.Date.IsZero() {
-		t.Error("Date was not parsed")
+	wantDate, _ := time.Parse(time.RFC3339, "2026-06-11T08:45:58Z")
+	if !e.Date.Equal(wantDate) {
+		t.Errorf("Date = %v, want %v", e.Date, wantDate)
 	}
 	if string(e.Body) != body {
 		t.Errorf("Body = %q, want the raw body", e.Body)
@@ -100,6 +106,18 @@ func TestNewAPIErrorNilResponse(t *testing.T) {
 	}
 	if len(e.Body) != 0 {
 		t.Errorf("Body = %q, want empty for a nil response body", e.Body)
+	}
+}
+
+func TestNewAPIErrorReadError(t *testing.T) {
+	// A body read failure must not crash; status is still captured, body is empty.
+	e := newAPIError(&http.Response{StatusCode: http.StatusBadGateway, Body: io.NopCloser(errReader{})})
+
+	if e.StatusCode != http.StatusBadGateway {
+		t.Errorf("StatusCode = %d, want 502", e.StatusCode)
+	}
+	if len(e.Body) != 0 {
+		t.Errorf("Body = %q, want empty on read error", e.Body)
 	}
 }
 

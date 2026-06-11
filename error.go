@@ -26,6 +26,9 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
 	switch {
 	case e.Code != "" && e.Description != "":
 		return fmt.Sprintf("%s: %s", e.Code, e.Description)
@@ -64,7 +67,7 @@ func newAPIError(res *http.Response) *APIError {
 	e := &APIError{StatusCode: res.StatusCode, Body: body}
 
 	var env errorEnvelope
-	if json.Unmarshal(body, &env) == nil {
+	if len(body) > 0 && json.Unmarshal(body, &env) == nil {
 		e.Code = env.Code
 		e.Level = env.Level
 		e.Description = env.Description
