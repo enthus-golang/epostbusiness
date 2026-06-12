@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
-	"time"
 )
 
 type login struct {
@@ -19,13 +16,6 @@ type login struct {
 
 type loginToken struct {
 	Token string `json:"token"`
-}
-
-type loginError struct {
-	Level       string    `json:"level"`
-	Code        string    `json:"code"`
-	Description string    `json:"description"`
-	Date        time.Time `json:"date"`
 }
 
 func (a *API) Login(ctx context.Context, vendorID, ekp, secret, password string) (bool, error) {
@@ -56,31 +46,16 @@ func (a *API) Login(ctx context.Context, vendorID, ekp, secret, password string)
 		}
 	}()
 
-	switch res.StatusCode {
-	case http.StatusOK:
-		var token loginToken
-		err = json.NewDecoder(res.Body).Decode(&token)
-		if err != nil {
-			return false, err
-		}
-
-		a.jwt = token.Token
-		return true, nil
-
-	case http.StatusBadRequest:
-		fallthrough
-	case http.StatusUnauthorized:
-		fallthrough
-	case http.StatusTooManyRequests:
-		var loginErr loginError
-		err = json.NewDecoder(res.Body).Decode(&loginErr)
-		if err != nil {
-			return false, err
-		}
-
-		return false, fmt.Errorf("%s: %s", loginErr.Code, loginErr.Description)
-
-	default:
-		return false, errors.New(res.Status)
+	if res.StatusCode != http.StatusOK {
+		return false, newAPIError(res)
 	}
+
+	var token loginToken
+	if err = json.NewDecoder(res.Body).Decode(&token); err != nil {
+		return false, err
+	}
+
+	a.jwt = token.Token
+
+	return true, nil
 }

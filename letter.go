@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 )
 
@@ -63,32 +61,15 @@ func (a API) CreateLetters(ctx context.Context, letters []Letter) ([]LetterIdent
 		}
 	}()
 
-	switch res.StatusCode {
-	case http.StatusOK:
-		err = json.NewDecoder(res.Body).Decode(&letterIdentifiers)
-		if err != nil {
-			return nil, err
-		}
-
-		return letterIdentifiers, nil
-
-	case http.StatusBadRequest:
-		fallthrough
-	case http.StatusUnauthorized:
-		fallthrough
-	case http.StatusTooManyRequests:
-		var loginErr loginError
-
-		err = json.NewDecoder(res.Body).Decode(&loginErr)
-		if err != nil {
-			return nil, err
-		}
-
-		return nil, fmt.Errorf("%s: %s", loginErr.Code, loginErr.Description)
-
-	default:
-		return nil, errors.New(res.Status)
+	if res.StatusCode != http.StatusOK {
+		return nil, newAPIError(res)
 	}
+
+	if err = json.NewDecoder(res.Body).Decode(&letterIdentifiers); err != nil {
+		return nil, err
+	}
+
+	return letterIdentifiers, nil
 }
 
 type LetterStatus struct {
@@ -158,11 +139,10 @@ func (a API) GetLettersStatusList(ctx context.Context, letterIDs []int) ([]Lette
 	}()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%d: %s", res.StatusCode, res.Status)
+		return nil, newAPIError(res)
 	}
 
-	err = json.NewDecoder(res.Body).Decode(&statusList)
-	if err != nil {
+	if err = json.NewDecoder(res.Body).Decode(&statusList); err != nil {
 		return nil, err
 	}
 
